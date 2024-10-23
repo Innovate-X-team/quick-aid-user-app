@@ -1,17 +1,21 @@
 /* eslint-disable react-native/no-inline-styles */
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Switch } from 'react-native';
-import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Switch, Alert, RefreshControl, ScrollView, Linking, TouchableWithoutFeedback } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
 import BackgroundService from 'react-native-background-actions';
 import Hamburger from '../../assets/Hamburger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import SideBar from './SideBar';
+import { promptForEnableLocationIfNeeded } from 'react-native-android-location-enabler';
+import { isLocationEnabled } from 'react-native-android-location-enabler';
+import messaging from '@react-native-firebase/messaging'
 import Geolocation from '@react-native-community/geolocation';
+import { WebView } from 'react-native-webview';
 import axios from 'axios';
 
 
-const updateLocation = async() => {
+const updateLocation = async () => {
     const username = await AsyncStorage.getItem('username');
-    Geolocation.watchPosition(async(position) => {
+    Geolocation.watchPosition(async (position) => {
         const location = [position.coords.latitude, position.coords.longitude];
         await axios.post(process.env.REACT_APP_API_ENDPOINT + '/api/update_location/', {
             username,
@@ -24,23 +28,72 @@ const updateLocation = async() => {
 };
 
 const ProviderHome = ({ navigation }) => {
-    const [username, setUsername] = useState('second');
+    const [refreshing, setRefreshing] = useState(false);
+    const [username, setUsername] = useState(null);
     const [sideBar, setSideBar] = useState(false);
     const [name, setName] = useState('');
     const [isOnDuty, setIsDuty] = useState(false);
+    const [isOnWork, setIsOnWork] = useState(false);
+    const [task, setTask] = useState(null);
+
+    const requestLocation = async () => {
+        const checkEnabled = await isLocationEnabled();
+        if (!checkEnabled) {
+            await promptForEnableLocationIfNeeded();
+        }
+    };
 
     const loadDetails = async () => {
+        const user = await AsyncStorage.getItem('username')
         setName(await AsyncStorage.getItem('name'));
-        setUsername(await AsyncStorage.getItem('username'));
+        setUsername(user);
+        axios.post(process.env.REACT_APP_API_ENDPOINT + '/api/is_onduty/',{
+            username
+        }).then(response=> {
+            setIsDuty(response.data.on_duty)
+        })
+        axios.post(process.env.REACT_APP_API_ENDPOINT + '/api/get_assigned_task/', {
+            username: user,
+        }).then((response) => {
+            if (response.status === 200) {
+                setTask(response.data.data);
+            }
+        }).catch((error) => {
+            Alert.alert('Failed to load details');
+        });
     };
+
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
+        loadDetails();
+        // Simulate a network request (e.g., fetching new data)
+        setTimeout(() => {
+            setRefreshing(false); // Stop refreshing after a delay
+        }, 2000); // Mock delay of 2 seconds
+    }, []);
 
     const toggleSwitch = async () => {
-        setIsDuty(!isOnDuty);
+        axios.post(`${process.env.REACT_APP_API_ENDPOINT}/api/onduty_toggle/`, {
+            username,
+            on_duty: !isOnDuty,
+        }).then((response) => {
+            if (response.status === 200) {
+                setIsDuty(!isOnDuty);
+            }
+        }).catch((error) => {
+            Alert.alert('Failed to update status');
+        });
     };
 
-    const backgroundServices = async() => {
+    const backgroundServices = async () => {
         if (isOnDuty) {
-            Geolocation.getCurrentPosition(async(position) => {
+            try {
+                await requestLocation();
+            } catch (error) {
+                Alert.alert('This app requires location permission to run.');
+                return;
+            }
+            Geolocation.getCurrentPosition(async (position) => {
                 const location = [position.coords.latitude, position.coords.longitude];
                 await axios.post(process.env.REACT_APP_API_ENDPOINT + '/api/update_location/', {
                     username,
@@ -63,14 +116,24 @@ const ProviderHome = ({ navigation }) => {
     useEffect(() => {
         loadDetails();
         backgroundServices();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOnDuty]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [username]);
+
+    useEffect(() => {
+        const unsubscribe = messaging().onMessage(async remoteMessage => {
+          loadDetails();
+        });
+    
+        return unsubscribe;
+      }, []);
 
     return (
         <>
             <StatusBar backgroundColor={'#e48634'} />
             {sideBar && <SideBar sideBar={sideBar} setSideBar={setSideBar} navigation={navigation} />}
-            <View style={styles.container}>
+            <View style={styles.container} RefreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }>
                 <View style={styles.header}>
                     <TouchableOpacity onPress={() => setSideBar(!sideBar)}>
                         <Hamburger style={{ width: 25, height: 25 }} />
@@ -87,6 +150,77 @@ const ProviderHome = ({ navigation }) => {
                         onValueChange={toggleSwitch}                       // Toggle function
                         value={isOnDuty}                                  // Current state
                     />
+                </View>
+                <View>
+                    {
+                        task && (
+                            <View style={{ marginBottom: 20 }}>
+                                <Text style={{ color: 'black', fontSize: 30, margin: 10 }}>Current Task: {task.task_name}</Text>
+                                <View style={styles.taskContainer}>
+                                    <View>
+                                        <Text style={{ color: 'black', fontSize: 25 }}>{task.consumer.name}</Text>
+                                        <Text style={{ color: 'black', fontSize: 18, margin: 5 }}>{task.task.location_name}</Text>
+                                    </View>
+                                    <View style={{ width: '100%', height: 200 }} onPress={()=>{}}>
+                                        <TouchableWithoutFeedback onPress={()=> {
+                                            Linking.openURL(`https://www.google.com/maps?q=${task.task.latitude},${task.task.longitude}`)
+                                        }}>
+                                        <WebView
+                                            source={{ uri: `https://www.openstreetmap.org/export/embed.html?bbox=${task.task.longitude - 0.00005},${task.task.latitude - 0.00005},${task.task.longitude + 0.00005},${task.task.latitude + 0.00005}&layer=mapnik&marker=${task.task.latitude},${task.task.longitude}` }}
+                                            style={{ height: 200, width: '100%', flex: 1 }}
+                                            javaScriptEnabled={true}
+                                            domStorageEnabled={true}
+                                            startInLoadingState={false}
+                                            scalesPageToFit={true}
+                                            originWhitelist={['*']}
+                                        />
+                                        </TouchableWithoutFeedback>
+                                    </View>
+                                    <View style={styles.buttonContainer}>
+                                        <TouchableOpacity
+                                            style={[styles.button, { borderBottomLeftRadius: 10 }]}
+                                            onPress={() => {
+                                                Linking.openURL(`tel:${task.consumer.phone_number}`)
+                                            }}
+                                        >
+                                            <Text style={{ color: 'white', fontSize: 18 }}>Call</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[styles.button, { borderBottomRightRadius: 10 }]}
+                                            onPress={()=> {
+                                                if(!isOnWork){
+                                                    axios.post(process.env.REACT_APP_API_ENDPOINT + '/api/accept_task/', {
+                                                        username,
+                                                        task_id: task.task.id
+                                                    }).then(response=> {
+                                                        if(response.status === 200){
+                                                            setIsOnWork(true)
+                                                        }
+                                                    }).catch(error=>{
+                                                        Alert.alert(error.response.data.error)
+                                                    })
+                                                }
+                                                else{
+                                                    axios.post(process.env.REACT_APP_API_ENDPOINT + '/api/complete_task/', {
+                                                        task_id: task.task.id
+                                                    }).then(response=> {
+                                                        if(response.status === 200){
+                                                            setIsOnWork(false)
+                                                            loadDetails()
+                                                        }
+                                                    }).catch(error=>{
+                                                        Alert.alert(error.response.data.error)
+                                                    })
+                                                }
+                                            }}
+                                        >
+                                            <Text style={{ color: 'white', fontSize: 18 }}>{isOnWork ? 'End Task' : 'Accept'}</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            </View>
+                        )
+                    }
                 </View>
 
                 <View style={styles.footer}>
@@ -120,43 +254,46 @@ const styles = StyleSheet.create({
         color: 'black',
     },
     servicesContainer: {
-        flex: 1,
         flexDirection: 'row',
-        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 20,
+        marginBottom: 20,
+    },
+    taskContainer: {
+        elevation: 2,
+        backgroundColor: '#f2efe9',
+        borderRadius: 10,
+        margin: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    map: {
+        flex: 1,
+        width: 500,
+        height: 300,
+        backgroundColor: '#f2efe9',
+        alignSelf: 'stretch'
+    },
+    buttonContainer: {
+        flexDirection: 'row',
         justifyContent: 'space-around',
-        marginTop: 20,
+        marginTop: 10,
     },
-    serviceButton: {
-        width: '40%',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginVertical: 10,
-        borderRadius: 10,// for a subtle shadow effect
-    },
-    serviceImgaeContainer: {
-        width: 120,
-        height: 120,
-        backgroundColor: '#f5f5f5',
-        borderRadius: 100,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 10,
-        overflow: 'hidden',
+    button: {
+        backgroundColor: '#FF8C00', // Orange color
         padding: 10,
-        borderWidth: 2,
-        borderColor: '#000',
-    },
-    serviceImgae: {
-        width: '100%',
-        height: '100%',
-    },
-    serviceText: {
-        color: 'black',
-        fontSize: 20,
-        fontWeight: 'bold',
-        textAlign: 'center',
+        margin: 0,
+        borderWidth: 0,
+        width: '50%',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     footer: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
         alignItems: 'center',
         padding: 15,
         backgroundColor: '#FF8C00', // Orange color

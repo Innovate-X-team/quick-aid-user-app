@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles */
-import { View, Text, TouchableOpacity, StyleSheet, Image, StatusBar, PermissionsAndroid, Linking, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, StatusBar, Alert, Linking } from 'react-native';
 import React, { useEffect, useState } from 'react';
 import Hamburger from '../../assets/Hamburger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -7,13 +7,15 @@ import SideBar from './SideBar';
 import { promptForEnableLocationIfNeeded } from 'react-native-android-location-enabler';
 import { isLocationEnabled } from 'react-native-android-location-enabler';
 import Geolocation from '@react-native-community/geolocation';
-import * as Location from 'react-native-geolocation-service';
+import NetInfo from '@react-native-community/netinfo';
 import axios from 'axios';
 
 
 const ConsumerHome = ({ navigation }) => {
   const [sideBar, setSideBar] = useState(false);
+  const [username, setUsername] = useState('');
   const [name, setName] = useState('');
+  const [isConnected, setIsConnected] = useState(null);
   // const [location, setLocation] = useState([]);
 
   const requestLocation = async() => {
@@ -23,7 +25,7 @@ const ConsumerHome = ({ navigation }) => {
     }
   };
 
-  const ambulanceService = async() => {
+  const callService = async(type) => {
     try{
       await requestLocation();
     }catch(error) {
@@ -32,9 +34,16 @@ const ConsumerHome = ({ navigation }) => {
     }
     Geolocation.getCurrentPosition(async(position) => {
       const location = [position.coords.latitude, position.coords.longitude];
-      await axios.post(process.env.REACT_APP_API_ENDPOINT + '/api/ambulance_service/',{
+      await axios.post(process.env.REACT_APP_API_ENDPOINT + '/api/call_service/',{
+        type,
+        username,
+        name,
         latitude: location[0],
         longitude: location[1],
+      }).then(response=> {
+        Alert.alert(response.data.message);
+      }).catch(error=>{
+        Alert.alert(error.response.data.message);
       });
     },
     (error)=> {
@@ -43,11 +52,20 @@ const ConsumerHome = ({ navigation }) => {
   };
 
   const loadDetails = async () => {
+    setUsername(await AsyncStorage.getItem('username'));
     setName(await AsyncStorage.getItem('name'));
   };
 
   useEffect(() => {
     loadDetails();
+
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsConnected(state.isConnected);
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   return (
@@ -64,42 +82,48 @@ const ConsumerHome = ({ navigation }) => {
         </View>
 
         <View style={styles.servicesContainer}>
-          <TouchableOpacity style={styles.serviceButton}>
+          <TouchableOpacity style={styles.serviceButton} onPress={()=> Linking.openURL('tel:1091')}>
             <View style={styles.serviceImgaeContainer}>
               <Image source={require('../../assets/women-safety.png')} style={styles.serviceImgae} />
             </View>
             <Text style={styles.serviceText}>Women's Safety</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.serviceButton}>
+          <TouchableOpacity style={styles.serviceButton} onPress={()=> Linking.openURL('tel:1098')}>
             <View style={styles.serviceImgaeContainer}>
               <Image source={require('../../assets/child-protection.png')} style={styles.serviceImgae} />
             </View>
             <Text style={styles.serviceText}>Child Protection</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.serviceButton} onPress={ambulanceService}>
+          <TouchableOpacity style={styles.serviceButton} onPress={()=>{
+            isConnected ?  callService('ambulance') : Linking.openURL('tel:102');
+          }}>
             <View style={styles.serviceImgaeContainer}>
               <Image source={require('../../assets/Ambulance.png')} style={styles.serviceImgae} />
             </View>
             <Text style={styles.serviceText}>Ambulance Service</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.serviceButton}>
+          <TouchableOpacity style={styles.serviceButton} onPress={()=>{
+            isConnected ?  callService('fire') : Linking.openURL('tel:101');
+          }}>
             <View style={styles.serviceImgaeContainer}>
               <Image source={require('../../assets/fire-safety.png')} style={styles.serviceImgae} />
             </View>
             <Text style={styles.serviceText}>Fire Safety Service</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.serviceButton}>
+          <TouchableOpacity style={styles.serviceButton} onPress={()=>{
+            isConnected ? callService('police') : Linking.openURL('tel:100');
+          }}>
             <View style={styles.serviceImgaeContainer}>
               <Image source={require('../../assets/police.png')} style={styles.serviceImgae} />
             </View>
             <Text style={styles.serviceText}>Police Service</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.serviceButton}>
+          <TouchableOpacity style={styles.serviceButton} onPress={()=> Linking.openURL('tel:011-23438091')}>
             <View style={styles.serviceImgaeContainer}>
               <Image source={require('../../assets/NDRF.png')} style={styles.serviceImgae} />
             </View>

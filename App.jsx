@@ -1,8 +1,9 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   SafeAreaView,
   StatusBar,
+  Alert
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
@@ -24,6 +25,9 @@ import CreateAccount from './pages/LoginRegister/createAccount';
 import About from './pages/About';
 import SplashScreen from './pages/SplashScreen';
 import ProviderHome from './pages/Provider/Home';
+import messaging from '@react-native-firebase/messaging';
+import notifee from '@notifee/react-native';
+
 
 
 const Stack = createNativeStackNavigator();
@@ -47,10 +51,12 @@ const App = () => {
   // console.log(process.env.REACT_APP_API_ENDPOINT);
 
   const requestLocationPermissions = async () => {
+    await notifee.requestPermission();
     try {
       await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION);
       await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION);
       await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION);
+      await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
       await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
       await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.BODY_SENSORS_BACKGROUND);
     } catch (error) {
@@ -76,6 +82,7 @@ const App = () => {
   // useEffect(() => {
   checkLogin();
   // }, []);
+
   return (
     <SafeAreaView style={{ height: '100%', width: '100%' }} >
       <StatusBar

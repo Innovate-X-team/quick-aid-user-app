@@ -1,4 +1,4 @@
-package com.connect_v1
+package com.innovatex.quickaid
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

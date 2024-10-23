@@ -1,4 +1,5 @@
-package com.connect_v1
+package com.innovatex.quickaid
+
 
 import android.app.Application
 import com.facebook.react.PackageList

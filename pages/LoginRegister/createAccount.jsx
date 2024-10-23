@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View, Image, TextInput, TouchableOpacity } from 'react-native';
 import React, { useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import messaging from '@react-native-firebase/messaging';
 import axios from 'axios';
 import Toast from 'react-native-toast-message';
 
@@ -8,7 +9,7 @@ const CreateAccount = ({ navigation, setIsLogedIn, route }) => {
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
 
-    const handleLogin = () => {
+    const handleLogin = async() => {
         // Validate input fields here
         if (password !== confirmPassword) {
             // eslint-disable-next-line no-alert
@@ -16,9 +17,13 @@ const CreateAccount = ({ navigation, setIsLogedIn, route }) => {
             return;
         }
 
+        await messaging().registerDeviceForRemoteMessages();
+        const token = await messaging().getToken();
+
         // Submit form data to server or perform other actions
         axios.post(`${process.env.REACT_APP_API_ENDPOINT}/api/create_user/`, {
             ...route.params,
+            device_token: token,
             password: password,
         }).then(async(response) => {
             Toast.show({

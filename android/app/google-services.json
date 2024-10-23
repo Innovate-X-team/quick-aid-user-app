@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1078206688185",
+    "project_id": "quick-aid-ea925",
+    "storage_bucket": "quick-aid-ea925.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1078206688185:android:be2c1956bb9ea8bfd06468",
+        "android_client_info": {
+          "package_name": "com.innovatex.quickaid"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDfq-W-HUsE28h9LQF31Fj1HSvuVWENhm4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

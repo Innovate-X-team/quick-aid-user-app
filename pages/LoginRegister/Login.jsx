@@ -4,13 +4,15 @@ import React, { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
 import axios from 'axios';
+import messaging from '@react-native-firebase/messaging';
+
 
 const Login = ({ navigation }) => {
     const [keyboardVisible, setKeyboardVisible] = useState(false);
     const [usernameEmail, setUsernameEmail] = useState('');
     const [password, setPassword] = useState('');
 
-    const handleLogin = () => {
+    const handleLogin = async() => {
         // Validate input fields here
         if (!usernameEmail || !password) {
             Toast.show({
@@ -21,10 +23,14 @@ const Login = ({ navigation }) => {
             return;
         }
 
+        await messaging().registerDeviceForRemoteMessages();
+        const token = await messaging().getToken();
+
         // Submit form data to server or perform other actions
         axios.post(`${process.env.REACT_APP_API_ENDPOINT}/api/login/`, {
             usernameEmail,
             password,
+            token,
         }).then(async(response, error) => {
             if(response.status === 200){
                 Toast.show({

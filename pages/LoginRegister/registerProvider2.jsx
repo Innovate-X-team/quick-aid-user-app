@@ -36,8 +36,7 @@ const RegisterProvider2 = ({ navigation, route }) => {
     };
 
     useEffect(()=> {
-        console.log(state)
-        state !== '' ? districts[state].districts : []
+        state !== '' ? districts[state].districts : [];
     },[state]);
 
     useEffect(() => {
