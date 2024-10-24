@@ -49,7 +49,7 @@ npx react-native run-android
 ```
 **5. Run the backend server:**
 
-See Quick Aid's server repository for starting the backend server. https://github.com/Innovate-X-team/Quick-Aid-Backend.git
+See Quick Aid's server repository for starting the backend server. https://github.com/Innovate-X-team/Quick-Aid-Backend
 
 ## Usage
 * **Register:** New users can sign up with an email and password.
