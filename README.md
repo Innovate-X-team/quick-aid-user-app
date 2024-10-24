@@ -23,7 +23,7 @@ Tech Stack
 
 ```
 1. git clone https://github.com/Innovate-X-team/quick-aid-user-app.git
-2. cd Quick-aid-user-app
+2. cd quick-aid-user-app
 ```
 **2. Install dependencies:**
 ```
